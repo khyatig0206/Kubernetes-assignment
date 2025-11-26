@@ -302,20 +302,54 @@ kubectl get hpa -w
 
 # 📌 Part 7 — Load Testing (Cookie Point)
 
-To generate CPU load on Flask, `/load` endpoint is used:
+To test the Horizontal Pod Autoscaler (HPA), we created a special CPU-intensive route:
+
+```python
+@app.route('/load')
+def load():
+    x = 0
+    for i in range(1000_000_000):  # more iterations → more CPU
+        x += i
+    return str(x)
+```
+
+This loop intentionally consumes CPU so that HPA can detect high utilization.
+
+---
+
+## ✔ Challenge: HPA Was Not Scaling Initially
+
+During testing, even after sending 20–30 concurrent requests, HPA was **not scaling**.
+Reasons:
+
+* CPU usage was too low.
+* The original `/load` endpoint had fewer iterations → not enough CPU pressure.
+* HPA requires sustained CPU > 70% for multiple seconds.
+
+### 🔧 Solution
+
+We increased the loop to:
+
+```
+for i in range(1_000_000_000):
+```
+
+This caused:
+
+* Higher CPU spikes
+* Longer sustained load
+* HPA successfully scaling pods from **2 → 3**
+
+Thus to generate CPU load on Flask, `/load` endpoint is used:
 
 ```bash
 ./hey.exe -z 25s -c 20 http://127.0.0.1:<port>/load
 ```
 
-Expected Results:
-
-* HPA sees CPU rising (e.g., 90% / 70%)
-* Pods scale from **2 → 3 → 4** depending on load
-
 Example:
 
 <img width="774" height="315" alt="Screenshot 2025-11-26 175035" src="https://github.com/user-attachments/assets/c12d029c-d73d-4d6f-b769-d368453dbd43" />
+
 Image shows HPA scaled the Deployment from 2 → 3 pods! when HPA saw CPU rising.
 ---
 
